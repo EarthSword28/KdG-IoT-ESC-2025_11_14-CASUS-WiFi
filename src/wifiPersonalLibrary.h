@@ -11,8 +11,13 @@ char *knownWifiPassword_PL[10] = {"", "", "", "", "", "", "", "", "", ""};  // t
 int wifiAttemps_PL = 5;   // amount of allowed attemps for device to connect to WiFi
 int wifiDelay_PL = 500;   // how much time between attemps
 
+String lastSsid_PL = "";
+String lastPassword_PL = "";
+
+boolean endProgram_global = LOW;
+
 // Initiate the WiFi Personal Library
-void wifiInit(int wifiAmounts_i_PL, char *knownWifiSsid_i_PL[], char *knownWifiPassword_i_PL[], int wifiAttemps_i_PL = 5, int wifiDelay_i_PL = 500) {
+void wifiInit(int wifiAmounts_i_PL, char *knownWifiSsid_i_PL[], char *knownWifiPassword_i_PL[], int wifiAttemps_i_PL = 5, int wifiDelay_i_PL = 500, char* wifiHostName_i_PL = "") {
   wifiAmounts_PL = wifiAmounts_i_PL;
   if (wifiAmounts_PL > 0) {
     if (wifiAmounts_PL > 10) {
@@ -35,9 +40,13 @@ void wifiConnect(const char* wifiHostName_PL = "", wifi_mode_t wifiMode_PL = WIF
   WiFi.mode(wifiMode_PL);
   int networks = WiFi.scanNetworks();
   if (networks > 0) {
-    for (int n = 0; n < networks && WiFi.status() != WL_CONNECTED; n++) {
-      String ssid = WiFi.SSID(n);
-      for (int i = 0; i < wifiAmounts_PL; i++) {
+    for (int i = 0; i < wifiAmounts_PL; i++) {
+      Serial.println(knownWifiSsid_PL[i]);
+      for (int n = 0; n < networks && WiFi.status() != WL_CONNECTED; n++) {
+        String ssid = WiFi.SSID(n);
+        if (ssid == "Hotspot-Jorden") {
+          Serial.println("Hotspot-Jorden");
+        }
         if (ssid == knownWifiSsid_PL[i]) {
           // if hostname, set hostname
           if (wifiHostName_PL != "") {
@@ -47,14 +56,21 @@ void wifiConnect(const char* wifiHostName_PL = "", wifi_mode_t wifiMode_PL = WIF
           String password = knownWifiPassword_PL[i];
           int connectAttemps = 0;
           WiFi.begin(ssid, password);
-          Serial.print("connecting to: ");
-          Serial.print(ssid);
           while (WiFi.status() != WL_CONNECTED && connectAttemps < wifiAttemps_PL) {
             connectAttemps++;
             delay(wifiDelay_PL);
-            Serial.print(".");
+            Serial.print("connecting to: ");
+            Serial.print(ssid);
+            Serial.print(" attempt: [");
+            Serial.print(connectAttemps);
+            Serial.print("/");
+            Serial.print(wifiAttemps_PL);
+            Serial.println("]");
           }
           if (WiFi.status() == WL_CONNECTED) {
+            lastSsid_PL = ssid;
+            lastPassword_PL = password;
+
             Serial.println("\nConnected to WiFi!");
             Serial.println(WiFi.localIP());
             break;
@@ -72,70 +88,32 @@ void wifiConnect(const char* wifiHostName_PL = "", wifi_mode_t wifiMode_PL = WIF
   }
 }
 
-// Get the status of the WiFi connection
-void getWifiStatus() {
-  wl_status_t status = WiFi.status();
-  if (status == WL_CONNECTED) {
-    String ssid = WiFi.SSID();
-    int rssi = WiFi.RSSI();
-    Serial.print("Connected to: ");
-    Serial.print(ssid);
-    Serial.print(" - ");
-    Serial.println(rssi);
-  }
-  else {
-    Serial.println("Status: Not Connected");
-  }
-}
-
 // Event-handler functies
-
-void onGotIP(WiFiEvent_t event, WiFiEventInfo_t info){
-  Serial.print("IP: ");
-  Serial.println(WiFi.localIP());
-}
-
 void onDisconnected(WiFiEvent_t event, WiFiEventInfo_t info){
   Serial.println("WiFi Disconnected, Attempting to Reconnect...");
-  WiFi.reconnect();
-  delay(wifiDelay_PL);
-  wl_status_t status = WiFi.status();
-  if (status == WL_CONNECTED) {
+
+  int connectAttempt = 0;
+  WiFi.begin(lastSsid_PL, lastPassword_PL);
+  while ((WiFi.status() != WL_CONNECTED) && (connectAttempt < wifiAttemps_PL)) {
+    connectAttempt++;
+    delay(wifiDelay_PL);
+    Serial.print("reconnecting to: ");
+    Serial.print(lastSsid_PL);
+    Serial.print(" attempt: [");
+    Serial.print(connectAttempt);
+    Serial.print("/");
+    Serial.print(wifiAttemps_PL);
+    Serial.println("]");
+
+    if (connectAttempt >= wifiAttemps_PL) {
+      break;
+    }
+  }
+
+  if (WiFi.status() == WL_CONNECTED) {
     Serial.println("Reconnected");
   }
   else {
-    Serial.println("Connection Failed");
+    endProgram_global = HIGH;
   }
 }
-
-/* void WiFiEvent(WiFiEvent_t event) {
-  Serial.printf("[WiFi-event] event: %d\n", event);
-
-  switch (event) {
-    case SYSTEM_EVENT_STA_START:
-      Serial.println("WiFi adapter gestart");
-      break;
-
-    case SYSTEM_EVENT_STA_CONNECTED:
-      Serial.println("Verbonden met WiFi netwerk");
-      break;
-
-    case SYSTEM_EVENT_STA_DISCONNECTED:
-      Serial.println("Verbinding verbroken - probeer opnieuw te verbinden...");
-      WiFi.reconnect();
-      break;
-
-    case SYSTEM_EVENT_STA_GOT_IP:
-      Serial.print("IP-adres gekregen: ");
-      Serial.println(WiFi.localIP());
-      break;
-
-    case SYSTEM_EVENT_STA_LOST_IP:
-      Serial.println("IP-adres verloren!");
-      break;
-
-    default:
-      Serial.println("Onbekend WiFi-event");
-      break;
-  }
-} */
