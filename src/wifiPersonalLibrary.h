@@ -93,7 +93,7 @@ void onDisconnected(WiFiEvent_t event, WiFiEventInfo_t info){
   Serial.println("WiFi Disconnected, Attempting to Reconnect...");
 
   int connectAttempt = 0;
-  WiFi.begin(lastSsid_PL, lastPassword_PL);
+  WiFi.reconnect();
   while ((WiFi.status() != WL_CONNECTED) && (connectAttempt < wifiAttemps_PL)) {
     connectAttempt++;
     delay(wifiDelay_PL);
